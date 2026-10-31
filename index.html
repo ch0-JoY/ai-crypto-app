@@ -157,6 +157,25 @@
   .plan .tag { position: absolute; top: -10px; left: 14px; background: var(--gold); color: var(--gold-ink); font-size: 11.5px; font-weight: 800; border-radius: 999px; padding: 2px 9px; }
   .save { color: var(--up); font-weight: 700; }
   .disc { color: var(--muted); font-size: 12px; text-align: center; margin: 22px 8px 0; }
+  /* панель ответа ИИ внутри мини-аппа */
+  .answer { position: fixed; inset: 0; z-index: 50; background: var(--ink); display: flex; flex-direction: column;
+    transform: translateY(100%); visibility: hidden; transition: transform .25s ease, visibility 0s linear .25s; }
+  .answer.on { transform: none; visibility: visible; transition: transform .25s ease; }
+  .answer header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); max-width: 560px; width: 100%; margin: 0 auto; }
+  .answer header b { flex: 1; font: 600 16px var(--display); }
+  .answer header button { background: var(--panel); border: 0; border-radius: 10px; width: 36px; height: 36px; font-size: 18px; }
+  .feed { flex: 1; overflow-y: auto; padding: 14px 16px; max-width: 560px; width: 100%; margin: 0 auto; }
+  .bubble { background: var(--panel); border-radius: 16px 16px 16px 4px; padding: 12px 14px; margin-bottom: 10px; white-space: pre-wrap;
+    overflow-wrap: anywhere; font-size: 14.5px; }
+  .bubble.me { background: var(--gold); color: var(--gold-ink); border-radius: 16px 16px 4px 16px; margin-left: 15%; font-weight: 600; }
+  .bubble a { color: var(--gold); } .bubble i { color: var(--muted); }
+  .bubble code { background: var(--ink); border-radius: 6px; padding: 1px 5px; font-size: 13px; }
+  .thinking { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; padding: 6px 2px 12px; }
+  .dots i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--gold); margin-right: 4px; animation: blink 1.2s infinite; }
+  .dots i:nth-child(2) { animation-delay: .2s; } .dots i:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+  .composer { padding: 10px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); max-width: 560px; width: 100%; margin: 0 auto; }
+  .composer .field { background: var(--panel); }
   .toast { position: fixed; left: 50%; bottom: 100px; transform: translate(-50%, 16px); opacity: 0; transition: .25s; z-index: 60;
     background: #000c; color: #fff; padding: 9px 15px; border-radius: 999px; pointer-events: none; font-size: 14px; white-space: nowrap; }
   .toast.on { opacity: 1; transform: translate(-50%, 0); }
@@ -267,6 +286,13 @@
 <!-- карточка монеты -->
 <div class="scrim" id="scrim"></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetName"><div class="in" id="sheetIn"></div></div>
+<div class="answer" id="answer" role="dialog" aria-modal="true" aria-labelledby="ansTitle">
+  <header><b id="ansTitle">ИИ-ассистент</b><button id="ansClose" aria-label="Закрыть">✕</button></header>
+  <div class="feed" id="feed"></div>
+  <form class="composer" id="composer"><div class="field">
+    <input id="chatInput" placeholder="Спроси ещё что-нибудь про крипту" autocomplete="off" enterkeyhint="send">
+    <button class="btn gold" type="submit">Отправить</button></div></form>
+</div>
 <div class="toast" id="toast"></div>
 
 <nav class="tabbar"><div class="in">
@@ -360,9 +386,82 @@ async function coinsByIds(ids) {
   return ids.map(byId).filter(Boolean);
 }
 
-// ---------- отправка боту ----------
+// ---------- связь с ботом ----------
+// Если мини-апп открыт из кнопки меню, у него есть подписанные данные пользователя (initData) и адрес API —
+// тогда ответы показываются прямо здесь, без закрытия окна. Иначе — старый способ через чат.
+const API = new URLSearchParams(location.search).get("api") || "";
+const INIT = (tg && tg.initData) || "";
+const apiMode = !!(API && INIT);
+
+async function callApi(action, arg = {}) {
+  const r = await fetch(API.replace(/\/$/, "") + "/api", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ initData: INIT, action, arg }) });
+  let data = {}; try { data = await r.json(); } catch (e) {}
+  if (!r.ok) throw new Error(data.error || "Бот не отвечает. Проверь, что он запущен, и открой приложение заново.");
+  if (data.state) { D = data.state; real = true; refreshAll(); }
+  return data;
+}
+
+const TITLES = { ask: "ИИ-ассистент", explain: "Разбор монеты", scam: "Проверка на скам", alert: "Алерт", add: "Портфель",
+  guess: "Игра", buy: "Оплата премиума", card: "Карточка" };
+const WAIT = { ask: "ИИ думает", explain: "Изучаю монету", scam: "Проверяю контракт, держателей и ликвидность", alert: "Ставлю алерт",
+  add: "Добавляю в портфель", guess: "Записываю прогноз", buy: "Создаю счёт", card: "Рисую карточку" };
+let busy = false;
+function bubble(htmlText, me = false) {
+  const b = document.createElement("div"); b.className = "bubble" + (me ? " me" : "");
+  if (me) b.textContent = htmlText; else b.innerHTML = htmlText;
+  $("feed").appendChild(b); b.scrollIntoView({ block: "end", behavior: "smooth" }); return b;
+}
+function openAnswer(action) {
+  $("ansTitle").textContent = TITLES[action] || "Ответ";
+  $("composer").style.display = "";
+  $("answer").classList.add("on");
+  closeSheet();
+}
+async function runAction(action, arg, myText) {
+  if (busy) return toast("Подожди, ещё отвечаю на прошлый запрос");
+  busy = true;
+  openAnswer(action);
+  if (myText) bubble(myText, true);
+  const wait = document.createElement("div"); wait.className = "thinking";
+  const started = Date.now();
+  wait.innerHTML = `<span class="dots"><i></i><i></i><i></i></span><span>${WAIT[action] || "Секунду"}…</span>`;
+  $("feed").appendChild(wait); wait.scrollIntoView({ block: "end" });
+  const timer = setInterval(() => { const s = Math.round((Date.now() - started) / 1000); wait.lastChild.textContent = `${WAIT[action] || "Секунду"}… ${s} с`; }, 1000);
+  try {
+    const res = await callApi(action, arg);
+    (res.messages || []).forEach(m => bubble(m));
+    if (res.payUrl) {
+      const b = bubble(`<b>Счёт готов.</b> Нажми кнопку — откроется @CryptoBot. После оплаты премиум включится сам за минуту.`);
+      const btn = document.createElement("button"); btn.className = "btn gold wide"; btn.textContent = "Оплатить в CryptoBot";
+      btn.onclick = () => (tg && tg.openTelegramLink ? tg.openTelegramLink(res.payUrl) : window.open(res.payUrl));
+      b.appendChild(btn);
+    }
+    if (res.upsell) {
+      const btn = document.createElement("button"); btn.className = "btn gold wide"; btn.textContent = "Смотреть премиум";
+      btn.onclick = () => { closeAnswer(); openTab("premium"); };
+      $("feed").lastChild.appendChild(btn);
+    }
+    try { tg.HapticFeedback.notificationOccurred("success"); } catch (e) {}
+  } catch (e) {
+    bubble(`<b>Не получилось.</b> ${esc(e.message)}`);
+  } finally {
+    clearInterval(timer); wait.remove(); busy = false;
+  }
+}
+function closeAnswer() { $("answer").classList.remove("on"); }
+$("ansClose").onclick = closeAnswer;
+$("composer").onsubmit = e => {
+  e.preventDefault(); const t = $("chatInput").value.trim(); if (!t) return;
+  $("chatInput").value = ""; runAction("ask", { text: t }, t);
+};
+
 function send(action, arg = {}) {
   haptic("medium");
+  if (apiMode && action !== "price") {
+    const mine = action === "ask" ? arg.text : action === "scam" && arg.text ? arg.text : action === "explain" ? `Объясни ${arg.name || arg.coin}` : "";
+    return runAction(action, arg, mine);
+  }
   const data = JSON.stringify({ action, arg });
   if (inTg) { try { tg.sendData(data); } catch (e) { tg.showAlert("Открой мини-апп кнопкой «📊 Рынок» под полем ввода в чате с ботом."); } }
   else toast("Превью: в Телеграме ответ придёт в чат");
@@ -459,7 +558,7 @@ const num = s => {
 };
 function closeSheet() { $("scrim").classList.remove("on"); $("sheet").classList.remove("on"); }
 $("scrim").onclick = closeSheet;
-document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") { closeSheet(); closeAnswer(); } });
 
 // ---------- портфель ----------
 async function renderPortfolio() {
@@ -583,12 +682,20 @@ document.querySelectorAll(".tabbar button").forEach(b => b.onclick = () => {
   document.querySelectorAll(".page").forEach(p => p.classList.toggle("on", p.id === "p-" + b.dataset.p));
   window.scrollTo({ top: 0 });
 });
-$("limitNote").textContent = isPro() ? "Премиум активен: всё без лимитов"
-  : `Сегодня осталось бесплатно: ${D.lim.ai} ${plural(D.lim.ai, ["ИИ-разбор", "ИИ-разбора", "ИИ-разборов"])}, ${D.lim.scam ? "1 скам-проверка" : "скам-проверок нет"}`;
-if (!real) $("limitNote").textContent += " (пример — открой из бота, чтобы увидеть свои данные)";
-
-renderPortfolio(); renderGame(); renderPremium(); tickClock(); setInterval(tickClock, 30000);
+function openTab(name) {
+  document.querySelectorAll(".tabbar button").forEach(x => x.classList.toggle("on", x.dataset.p === name));
+  document.querySelectorAll(".page").forEach(p => p.classList.toggle("on", p.id === "p-" + name));
+  window.scrollTo({ top: 0 });
+}
+function refreshAll() {
+  $("limitNote").textContent = isPro() ? "Премиум активен: всё без лимитов"
+    : `Сегодня осталось бесплатно: ${D.lim.ai} ${plural(D.lim.ai, ["ИИ-разбор", "ИИ-разбора", "ИИ-разборов"])}, ${D.lim.scam ? "1 скам-проверка" : "скам-проверок нет"}`;
+  if (!real) $("limitNote").textContent += " (пример — открой из бота, чтобы увидеть свои данные)";
+  renderPortfolio(); renderGame(); renderPremium();
+}
+refreshAll(); tickClock(); setInterval(tickClock, 30000);
 loadMarket();
+if (apiMode) callApi("state").catch(e => toast(e.message));
 </script>
 </body>
 </html>
