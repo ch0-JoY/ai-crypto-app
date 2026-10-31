@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>AI Crypto</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0F1B33; --panel: #172645; --panel2: #1D2F55; --line: #26375C;
+    --text: #EEF2FA; --muted: #8C9BB8; --gold: #F2B544; --gold-ink: #2A1E00;
+    --up: #3DD9A0; --down: #FF6B6B;
+    --r-lg: 20px; --r-md: 14px; --r-sm: 10px;
+    --display: "Unbounded", "Manrope", system-ui, sans-serif;
+    --body: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--ink); color: var(--text); font: 15px/1.45 var(--body); }
+  body { padding-bottom: calc(86px + env(safe-area-inset-bottom)); }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 14px 16px 24px; }
+  .page { display: none; } .page.on { display: block; }
+  h1 { font: 700 22px/1.2 var(--display); margin: 6px 0 4px; letter-spacing: -.01em; }
+  h2 { font: 600 16px/1.3 var(--body); margin: 22px 0 10px; color: var(--text); }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  .up { color: var(--up); } .down { color: var(--down); }
+  .num { font-family: var(--display); font-weight: 500; letter-spacing: -.02em; }
+
+  /* нижняя панель */
+  .tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: rgba(15,27,51,.94);
+    backdrop-filter: blur(12px); border-top: 1px solid var(--line); padding: 6px 8px calc(8px + env(safe-area-inset-bottom)); }
+  .tabbar .in { max-width: 560px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  .tabbar button { background: none; border: 0; padding: 6px 0 2px; border-radius: 12px; color: var(--muted);
+    display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11.5px; font-weight: 600; }
+  .tabbar button svg { width: 24px; height: 24px; }
+  .tabbar button.on { color: var(--text); }
+  .tabbar button.on svg { color: var(--gold); }
+
+  /* лента главных монет */
+  .strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px 0 4px; }
+  .strip button { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px; text-align: left; }
+  .strip b { display: block; font: 700 13px var(--body); }
+  .strip .num { font-size: 15px; display: block; margin: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .field { display: flex; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-md); padding: 6px 6px 6px 12px; align-items: center; }
+  .field input { flex: 1; min-width: 0; background: none; border: 0; outline: none; padding: 8px 0; }
+  .field input::placeholder { color: var(--muted); }
+  .btn { border: 0; border-radius: 11px; padding: 10px 14px; font-weight: 700; background: var(--panel2); }
+  .btn.gold { background: var(--gold); color: var(--gold-ink); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.wide { width: 100%; padding: 13px; margin-top: 10px; }
+
+  /* список монет */
+  .list { background: var(--panel); border-radius: var(--r-lg); overflow: hidden; }
+  .row { display: grid; grid-template-columns: 22px 30px minmax(0, 1fr) 64px 92px; align-items: center; gap: 8px; width: 100%;
+    background: none; border: 0; border-bottom: 1px solid var(--line); padding: 11px 12px; text-align: left; }
+  .row:last-child { border-bottom: 0; }
+  .row .rank { color: var(--muted); font-size: 12px; text-align: right; }
+  .row img, .avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--panel2); }
+  .avatar { display: grid; place-items: center; font: 700 11px var(--body); color: var(--muted); }
+  .row .nm b { display: block; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .nm span { color: var(--muted); font-size: 12.5px; }
+  .row .pr { text-align: right; }
+  .row .pr .num { font-size: 13.5px; display: block; }
+  .chg { font-size: 12.5px; font-weight: 700; }
+  .spark { width: 64px; height: 26px; }
+  .state { padding: 22px 16px; text-align: center; color: var(--muted); }
+
+  /* карточка монеты (выезжает снизу) */
+  .scrim { position: fixed; inset: 0; background: rgba(5,10,22,.6); z-index: 40; opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .scrim.on { opacity: 1; pointer-events: auto; }
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 41; background: var(--panel); border-radius: 22px 22px 0 0;
+    max-height: 92vh; overflow-y: auto; transform: translateY(100%); visibility: hidden;
+    transition: transform .25s ease, visibility 0s linear .25s; border-top: 1px solid var(--line); }
+  .sheet.on { transform: translateY(0); visibility: visible; transition: transform .25s ease; }
+  .sheet .in { max-width: 560px; margin: 0 auto; padding: 10px 16px calc(20px + env(safe-area-inset-bottom)); }
+  .grab { width: 40px; height: 4px; border-radius: 4px; background: var(--line); margin: 0 auto 12px; }
+  .coinhead { display: flex; align-items: center; gap: 12px; }
+  .coinhead img { width: 40px; height: 40px; border-radius: 50%; }
+  .bigprice { font: 700 34px/1.1 var(--display); letter-spacing: -.03em; margin: 14px 0 4px; }
+  .chart { width: 100%; height: 150px; margin: 10px 0 4px; display: block; }
+  .facts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .facts div { background: var(--ink); border-radius: var(--r-sm); padding: 9px 11px; }
+  .facts span { display: block; color: var(--muted); font-size: 12px; }
+  .facts b { font-weight: 700; }
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+  .act { background: var(--ink); border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px; text-align: left; }
+  .act b { display: block; font-weight: 700; } .act span { color: var(--muted); font-size: 12.5px; }
+  .act.on { border-color: var(--gold); }
+  .form { display: none; margin-top: 12px; } .form.on { display: block; }
+  .form .field { background: var(--ink); }
+  .form .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  /* портфель */
+  .pfhead { display: flex; gap: 16px; align-items: center; background: var(--panel); border-radius: var(--r-lg); padding: 16px; margin-top: 12px; }
+  .donut { width: 108px; height: 108px; flex: none; }
+  .pfhead .num.total { font-size: 26px; display: block; font-weight: 700; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+  .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+  .hrow { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 12px; border-bottom: 1px solid var(--line); }
+  .hrow:last-child { border-bottom: 0; }
+  .hrow .r { text-align: right; } .hrow .r .num { display: block; font-size: 14px; }
+  .pick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .pick button { background: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 6px 11px; font-size: 13px; font-weight: 600; }
+  .pick button.on { border-color: var(--gold); color: var(--gold); }
+
+  /* игра — главный акцент */
+  .arena { background: radial-gradient(120% 90% at 50% 0%, #22386A 0%, var(--panel) 60%); border-radius: 24px; padding: 18px 16px 16px; margin-top: 12px; text-align: center; }
+  .coin { width: 92px; height: 92px; margin: 2px auto 10px; border-radius: 50%; position: relative;
+    background: radial-gradient(circle at 35% 30%, #FFE4A0, var(--gold) 45%, #B9811B 100%);
+    box-shadow: inset 0 -6px 0 rgba(0,0,0,.18), 0 10px 30px rgba(242,181,68,.25); display: grid; place-items: center; }
+  .coin::after { content: ""; position: absolute; inset: 9px; border-radius: 50%; border: 2px dashed rgba(42,30,0,.35); }
+  .coin span { font: 700 30px var(--display); color: var(--gold-ink); z-index: 1; }
+  .arena .vs { display: flex; justify-content: center; gap: 22px; margin: 8px 0 2px; }
+  .arena .vs div span { display: block; font-size: 12px; color: var(--muted); }
+  .arena .vs .num { font-size: 18px; }
+  .clock { font: 600 13px var(--body); color: var(--muted); margin-top: 6px; }
+  .bets { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+  .bet { border: 0; border-radius: 18px; padding: 18px 10px 14px; display: flex; flex-direction: column; align-items: center; gap: 6px; font-weight: 800; font-size: 16px; }
+  .bet svg { width: 34px; height: 34px; }
+  .bet.upb { background: rgba(61,217,160,.14); color: var(--up); box-shadow: inset 0 0 0 1.5px rgba(61,217,160,.5); }
+  .bet.dnb { background: rgba(255,107,107,.13); color: var(--down); box-shadow: inset 0 0 0 1.5px rgba(255,107,107,.5); }
+  .bet:active { transform: scale(.97); }
+  .bet[disabled] { opacity: .35; }
+  .bet.picked { opacity: 1; box-shadow: inset 0 0 0 3px currentColor; }
+  .streak { display: flex; gap: 6px; justify-content: center; margin-top: 14px; }
+  .streak i { width: 30px; height: 8px; border-radius: 6px; background: var(--line); }
+  .streak i.on { background: var(--gold); }
+  .board { background: var(--panel); border-radius: var(--r-lg); overflow: hidden; }
+  .board div { display: grid; grid-template-columns: 30px 1fr auto; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--line); align-items: center; }
+  .board div:last-child { border-bottom: 0; }
+  .invite { background: var(--panel); border-radius: var(--r-lg); padding: 16px; margin-top: 12px; }
+  .invite .field { background: var(--ink); margin-top: 10px; }
+  .invite code { font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+
+  /* премиум */
+  .status { border-radius: var(--r-lg); padding: 16px; margin-top: 12px; background: var(--panel); border: 1px solid var(--line); }
+  .status.pro { border-color: var(--gold); background: linear-gradient(160deg, rgba(242,181,68,.16), var(--panel) 60%); }
+  .meter { height: 6px; border-radius: 6px; background: var(--ink); margin-top: 8px; overflow: hidden; }
+  .meter i { display: block; height: 100%; background: var(--gold); }
+  .compare { width: 100%; border-collapse: collapse; background: var(--panel); border-radius: var(--r-lg); overflow: hidden; font-size: 14px; }
+  .compare th, .compare td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--line); }
+  .compare th { font-weight: 600; color: var(--muted); font-size: 13px; }
+  .compare td:last-child, .compare th:last-child { color: var(--gold); font-weight: 700; }
+  .compare tr:last-child td { border-bottom: 0; }
+  .plan { display: flex; align-items: center; gap: 12px; width: 100%; background: var(--panel); border: 1.5px solid var(--line);
+    border-radius: var(--r-lg); padding: 14px; margin-top: 10px; text-align: left; position: relative; }
+  .plan.pop { border-color: var(--gold); }
+  .plan .t { flex: 1; } .plan .t b { display: block; font-size: 16px; } .plan .t span { color: var(--muted); font-size: 13px; }
+  .plan .p { font: 700 18px var(--display); }
+  .plan .tag { position: absolute; top: -10px; left: 14px; background: var(--gold); color: var(--gold-ink); font-size: 11.5px; font-weight: 800; border-radius: 999px; padding: 2px 9px; }
+  .save { color: var(--up); font-weight: 700; }
+  .disc { color: var(--muted); font-size: 12px; text-align: center; margin: 22px 8px 0; }
+  .toast { position: fixed; left: 50%; bottom: 100px; transform: translate(-50%, 16px); opacity: 0; transition: .25s; z-index: 60;
+    background: #000c; color: #fff; padding: 9px 15px; border-radius: 999px; pointer-events: none; font-size: 14px; white-space: nowrap; }
+  .toast.on { opacity: 1; transform: translate(-50%, 0); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ РЫНОК ============ -->
+  <section class="page on" id="p-market">
+    <h1>Рынок</h1>
+    <div class="muted small" id="limitNote"></div>
+    <div class="strip" id="strip"></div>
+
+    <h2>Найти монету</h2>
+    <form class="field" id="searchForm">
+      <input id="searchInput" placeholder="Например: solana, тон, pepe" autocomplete="off" enterkeyhint="search">
+      <button class="btn gold" type="submit">Найти</button>
+    </form>
+    <div class="list" id="searchList" style="margin-top:8px;display:none"></div>
+
+    <h2>Проверить токен на скам</h2>
+    <form class="field" id="scamForm">
+      <input id="scamInput" placeholder="Адрес контракта 0x… или название" autocomplete="off">
+      <button class="btn gold" type="submit">Проверить</button>
+    </form>
+    <div class="muted small" style="margin-top:6px">Найду ханипот, скрытые налоги, китов и слабую ликвидность. Ответ придёт в чат.</div>
+
+    <h2>Спросить ИИ</h2>
+    <form class="field" id="askForm">
+      <input id="askInput" placeholder="Что такое стейкинг? Как не попасть на скам?" autocomplete="off">
+      <button class="btn" type="submit">Спросить</button>
+    </form>
+
+    <h2>Топ по капитализации</h2>
+    <div class="list" id="market"><div class="state">Загружаю рынок…</div></div>
+    <div class="disc">Цены: CoinGecko. Не финансовый совет — решения о покупке принимай сам.</div>
+  </section>
+
+  <!-- ============ ПОРТФЕЛЬ ============ -->
+  <section class="page" id="p-portfolio">
+    <h1>Портфель</h1>
+    <div class="pfhead" id="pfHead"></div>
+    <h2>Монеты</h2>
+    <div class="list" id="holdings"></div>
+    <button class="btn wide" id="cardBtn">Карточка для друзей</button>
+    <div class="muted small" style="margin-top:6px;text-align:center">Только проценты, без сумм — можно смело пересылать.</div>
+
+    <h2>Добавить монету</h2>
+    <form class="field" id="addSearch">
+      <input id="addQuery" placeholder="Какую монету добавить?" autocomplete="off">
+      <button class="btn" type="submit">Найти</button>
+    </form>
+    <div class="pick" id="addPick"></div>
+    <div class="form" id="addForm">
+      <div class="two" style="margin-top:8px">
+        <div class="field"><input id="addAmount" inputmode="decimal" placeholder="Сколько монет"></div>
+        <div class="field"><input id="addBuy" inputmode="decimal" placeholder="Цена покупки, $"></div>
+      </div>
+      <button class="btn gold wide" id="addBtn" disabled>Добавить в портфель</button>
+    </div>
+    <div class="muted small" id="pfLimit" style="margin-top:8px"></div>
+  </section>
+
+  <!-- ============ ИГРА ============ -->
+  <section class="page" id="p-game">
+    <h1>Вверх или вниз</h1>
+    <div class="muted small">Угадай, где будет биткоин к концу дня по UTC относительно утренней цены.</div>
+    <div class="arena">
+      <div class="coin"><span>₿</span></div>
+      <div class="vs">
+        <div><span>Утром</span><b class="num" id="gOpen">—</b></div>
+        <div><span>Сейчас</span><b class="num" id="gNow">—</b></div>
+      </div>
+      <div class="clock" id="gClock"></div>
+      <div class="bets">
+        <button class="bet upb" id="betUp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-6 4 4 6-8"/><path d="M14 7h6v6"/></svg>Вверх</button>
+        <button class="bet dnb" id="betDown"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7l6 6 4-4 6 8"/><path d="M14 17h6v-6"/></svg>Вниз</button>
+      </div>
+      <div class="muted small" id="gHint" style="margin-top:10px"></div>
+      <div class="streak" id="gStreak"></div>
+      <div class="small" id="gStreakText" style="margin-top:6px"></div>
+    </div>
+    <h2>Лучшие игроки</h2>
+    <div class="board" id="board"></div>
+
+    <div class="invite">
+      <b>Позови друга — вам обоим премиум</b>
+      <div class="muted small" id="refText"></div>
+      <div class="field"><code id="refLink"></code><button class="btn" id="copyRef">Копировать</button></div>
+      <button class="btn gold wide" id="shareRef">Отправить другу</button>
+    </div>
+  </section>
+
+  <!-- ============ ПРЕМИУМ ============ -->
+  <section class="page" id="p-premium">
+    <h1>Премиум</h1>
+    <div class="status" id="status"></div>
+    <h2>Что меняется</h2>
+    <table class="compare" id="compare"></table>
+    <h2>Выбери срок</h2>
+    <div id="plans"></div>
+    <div class="muted small" style="margin-top:10px">Оплата криптой через @CryptoBot: USDT, TON, BTC. После выбора бот пришлёт кнопку оплаты, премиум включится сам за минуту.</div>
+  </section>
+</div>
+
+<!-- карточка монеты -->
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetName"><div class="in" id="sheetIn"></div></div>
+<div class="toast" id="toast"></div>
+
+<nav class="tabbar"><div class="in">
+  <button data-p="market" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/></svg>Рынок</button>
+  <button data-p="portfolio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="3"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/></svg>Портфель</button>
+  <button data-p="game"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5h3.5a2 2 0 0 1 0 4H9.5zm0 4h4a2 2 0 0 1 0 4h-4zM11 7v2m0 7v2"/></svg>Игра</button>
+  <button data-p="premium"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l3 6-9 12L3 9z"/><path d="M3 9h18M9 3l3 6 3-6M12 21L9 9m3 12l3-12"/></svg>Премиум</button>
+</div></nav>
+
+<script>
+const tg = window.Telegram && window.Telegram.WebApp;
+const inTg = !!(tg && tg.platform && tg.platform !== "unknown");
+if (tg) { tg.ready(); tg.expand(); try { tg.setHeaderColor("#0F1B33"); tg.setBackgroundColor("#0F1B33"); } catch (e) {} }
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const haptic = (t = "light") => { try { tg.HapticFeedback.impactOccurred(t); } catch (e) {} };
+const CG = "https://api.coingecko.com/api/v3";
+const PALETTE = ["#F2B544", "#3DD9A0", "#6EA8FF", "#C792EA", "#FF8F6B", "#7FDBFF", "#8C9BB8"];
+
+// ---------- данные от бота ----------
+const DEMO = { h: [["bitcoin", "BTC", 0.05, 60000], ["the-open-network", "TON", 120, 5.1], ["ethereum", "ETH", 0.8, null]],
+  a: 1, pr: "", lim: { ai: 3, aiMax: 5, scam: 1, alerts: 3, pf: 5 },
+  g: { guess: "", open: null, pts: 40, streak: 4, best: 5, close: 20, top: [["Даня", 120, 6], ["Kate", 90, 2], ["Лёша", 70, 0], ["Вася", 40, 4], ["Mike", 30, 1]] },
+  plans: [["week", 7, 1.99, "Неделя"], ["month", 30, 4.99, "Месяц"], ["year", 365, 29.99, "Год"]], pop: "month",
+  ref: "https://t.me/ai_crypto_app?start=ref1", refDays: 3 };
+let D = DEMO, real = false;
+(() => {
+  const s = new URLSearchParams(location.search).get("d");
+  if (!s) return;
+  try {
+    let b = s.replace(/-/g, "+").replace(/_/g, "/"); while (b.length % 4) b += "=";
+    D = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b), c => c.charCodeAt(0)))); real = true;
+  } catch (e) { console.warn("Не удалось прочитать данные бота", e); }
+})();
+const isPro = () => !!D.pr;
+
+// ---------- форматирование ----------
+function usd(x) {
+  if (x == null || isNaN(x)) return "—";
+  if (x >= 1000) return "$" + Math.round(x).toLocaleString("en-US");
+  if (x >= 1) return "$" + x.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (x === 0) return "$0";
+  const d = Math.min(12, Math.max(2, -Math.floor(Math.log10(x)) + 3));
+  return "$" + x.toFixed(d);
+}
+function big(x) {
+  if (!x) return "—";
+  for (const [v, s] of [[1e12, "T"], [1e9, "B"], [1e6, "M"], [1e3, "K"]]) if (x >= v) return "$" + (x / v).toFixed(2) + s;
+  return "$" + Math.round(x);
+}
+const chg = x => x == null ? '<span class="chg muted">—</span>' : `<span class="chg ${x >= 0 ? "up" : "down"}">${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(2)}%</span>`;
+const plural = (n, f) => { n = Math.abs(n) % 100; if (n > 10 && n < 20) return f[2]; n %= 10; return n === 1 ? f[0] : n > 1 && n < 5 ? f[1] : f[2]; };
+
+function sparkPath(pts, w, h, pad = 2) {
+  if (!pts || pts.length < 2) return "";
+  const step = Math.max(1, Math.floor(pts.length / 70)), p = pts.filter((_, i) => i % step === 0);
+  const min = Math.min(...p), max = Math.max(...p), span = max - min || 1;
+  return p.map((v, i) => `${i ? "L" : "M"}${(i / (p.length - 1) * w).toFixed(1)},${(pad + (1 - (v - min) / span) * (h - 2 * pad)).toFixed(1)}`).join("");
+}
+function spark(pts, up) {
+  const d = sparkPath(pts, 64, 26);
+  return d ? `<svg class="spark" viewBox="0 0 64 26" aria-hidden="true"><path d="${d}" fill="none" stroke="${up ? "var(--up)" : "var(--down)"}" stroke-width="1.6" stroke-linejoin="round"/></svg>` : "<span></span>";
+}
+
+// ---------- CoinGecko из браузера (с кэшем) ----------
+async function cg(path, ttl = 120) {
+  const key = "cg:" + path;
+  try { const c = JSON.parse(localStorage.getItem(key) || "null"); if (c && c.t > Date.now()) return c.v; } catch (e) {}
+  const r = await fetch(CG + path);
+  if (!r.ok) throw new Error(r.status === 429 ? "Слишком много запросов к ценам. Попробуй через минуту." : "Сервис цен ответил ошибкой " + r.status);
+  const v = await r.json();
+  try { localStorage.setItem(key, JSON.stringify({ t: Date.now() + ttl * 1000, v })); } catch (e) {}
+  return v;
+}
+let MARKET = [];
+const byId = id => MARKET.find(c => c.id === id);
+async function loadMarket() {
+  try {
+    MARKET = await cg("/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1&sparkline=true&price_change_percentage=24h,7d");
+    renderMarket(); renderPortfolio(); renderGame();
+  } catch (e) {
+    $("market").innerHTML = `<div class="state">${esc(e.message || "Не удалось загрузить рынок.")}<br><button class="btn" style="margin-top:10px" onclick="loadMarket()">Обновить</button></div>`;
+    renderPortfolio(); renderGame();
+  }
+}
+async function coinsByIds(ids) {
+  const missing = ids.filter(id => !byId(id));
+  if (missing.length) {
+    try { (await cg(`/coins/markets?vs_currency=usd&ids=${missing.join(",")}&sparkline=true&price_change_percentage=24h,7d`)).forEach(c => MARKET.push(c)); } catch (e) {}
+  }
+  return ids.map(byId).filter(Boolean);
+}
+
+// ---------- отправка боту ----------
+function send(action, arg = {}) {
+  haptic("medium");
+  const data = JSON.stringify({ action, arg });
+  if (inTg) { try { tg.sendData(data); } catch (e) { tg.showAlert("Открой мини-апп кнопкой «📊 Рынок» под полем ввода в чате с ботом."); } }
+  else toast("Превью: в Телеграме ответ придёт в чат");
+}
+function toast(t) { const el = $("toast"); el.textContent = t; el.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove("on"), 2400); }
+
+// ---------- рынок ----------
+function rowHTML(c, i) {
+  const up = (c.price_change_percentage_24h || 0) >= 0;
+  return `<button class="row" data-id="${esc(c.id)}"><span class="rank">${c.market_cap_rank || i + 1}</span>
+    ${c.image ? `<img src="${esc(c.image)}" alt="" loading="lazy">` : `<span class="avatar">${esc((c.symbol || "?").slice(0, 3).toUpperCase())}</span>`}
+    <span class="nm"><b>${esc(c.name)}</b><span>${esc((c.symbol || "").toUpperCase())}</span></span>
+    ${spark(c.sparkline_in_7d && c.sparkline_in_7d.price, (c.price_change_percentage_7d_in_currency ?? 0) >= 0)}
+    <span class="pr"><span class="num">${usd(c.current_price)}</span>${chg(c.price_change_percentage_24h)}</span></button>`;
+}
+function bindRows(el) { el.querySelectorAll(".row").forEach(b => b.onclick = () => openCoin(b.dataset.id)); }
+function renderMarket() {
+  $("market").innerHTML = MARKET.slice(0, 50).map(rowHTML).join("") || '<div class="state">Нет данных</div>';
+  bindRows($("market"));
+  $("strip").innerHTML = ["bitcoin", "ethereum", "the-open-network"].map(id => byId(id)).filter(Boolean).map(c =>
+    `<button data-id="${c.id}"><b>${esc(c.symbol.toUpperCase())}</b><span class="num">${usd(c.current_price)}</span>${chg(c.price_change_percentage_24h)}</button>`).join("");
+  $("strip").querySelectorAll("button").forEach(b => b.onclick = () => openCoin(b.dataset.id));
+}
+$("searchForm").onsubmit = async e => {
+  e.preventDefault();
+  const q = $("searchInput").value.trim(); if (!q) return;
+  const box = $("searchList"); box.style.display = "block"; box.innerHTML = '<div class="state">Ищу…</div>';
+  try {
+    const found = (await cg("/search?query=" + encodeURIComponent(q), 3600)).coins.slice(0, 6);
+    if (!found.length) { box.innerHTML = '<div class="state">Ничего не нашёл. Попробуй тикер, например «sol».</div>'; return; }
+    const coins = await coinsByIds(found.map(c => c.id));
+    box.innerHTML = (coins.length ? coins : found.map(c => ({ id: c.id, name: c.name, symbol: c.symbol, image: c.thumb, market_cap_rank: c.market_cap_rank }))).map(rowHTML).join("");
+    bindRows(box);
+  } catch (err) { box.innerHTML = `<div class="state">${esc(err.message)}</div>`; }
+};
+$("scamForm").onsubmit = e => { e.preventDefault(); const t = $("scamInput").value.trim(); if (t) send("scam", { text: t }); };
+$("askForm").onsubmit = e => { e.preventDefault(); const t = $("askInput").value.trim(); if (t) send("ask", { text: t }); };
+
+// ---------- карточка монеты ----------
+let SHEET_COIN = null;
+async function openCoin(id) {
+  haptic();
+  let c = byId(id);
+  if (!c) { [c] = await coinsByIds([id]); }
+  if (!c) { toast("Не удалось загрузить монету"); return; }
+  SHEET_COIN = c;
+  const pts = c.sparkline_in_7d && c.sparkline_in_7d.price, up = (c.price_change_percentage_7d_in_currency ?? 0) >= 0;
+  const d = sparkPath(pts, 320, 140, 6), col = up ? "#3DD9A0" : "#FF6B6B";
+  const aiLeft = isPro() ? "без лимита" : `осталось ${D.lim.ai} из ${D.lim.aiMax} сегодня`;
+  const scamLeft = isPro() ? "без лимита" : D.lim.scam ? "1 бесплатная сегодня" : "бесплатная уже использована";
+  $("sheetIn").innerHTML = `<div class="grab"></div>
+    <div class="coinhead">${c.image ? `<img src="${esc(c.image)}" alt="">` : `<span class="avatar" style="width:40px;height:40px">${esc(c.symbol.slice(0, 3).toUpperCase())}</span>`}<div><b id="sheetName" style="font-size:17px">${esc(c.name)}</b>
+      <div class="muted small">${esc(c.symbol.toUpperCase())}${c.market_cap_rank ? `, место ${c.market_cap_rank} по капитализации` : ""}</div></div></div>
+    <div class="bigprice">${usd(c.current_price)}</div>
+    <div>${chg(c.price_change_percentage_24h)} <span class="muted small">за сутки</span>&nbsp;&nbsp;${chg(c.price_change_percentage_7d_in_currency)} <span class="muted small">за неделю</span></div>
+    ${d ? `<svg class="chart" viewBox="0 0 320 140" preserveAspectRatio="none" aria-label="График за 7 дней">
+      <defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".35"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+      <path d="${d}L320,140L0,140Z" fill="url(#ga)"/><path d="${d}" fill="none" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>
+      <div class="muted small">График за 7 дней</div>` : ""}
+    <div class="facts">
+      <div><span>Капитализация</span><b>${big(c.market_cap)}</b></div><div><span>Объём за сутки</span><b>${big(c.total_volume)}</b></div>
+      <div><span>Рекорд</span><b>${usd(c.ath)}</b></div><div><span>От рекорда</span><b>${chg(c.ath_change_percentage)}</b></div>
+    </div>
+    <div class="actions">
+      <button class="act" data-a="explain"><b>Объясни монету</b><span>ИИ простыми словами, ${aiLeft}</span></button>
+      <button class="act" data-a="scam"><b>Проверить на скам</b><span>${scamLeft}</span></button>
+      <button class="act" data-a="alert"><b>Поставить алерт</b><span>Напишу, когда цена дойдёт</span></button>
+      <button class="act" data-a="add"><b>В портфель</b><span>Считать стоимость и прибыль</span></button>
+    </div>
+    <div class="form" id="fAlert"><div class="field"><input id="alertPrice" inputmode="decimal" placeholder="Цена в $, например ${(() => { const v = c.current_price * 1.1; return v >= 100 ? Math.round(v) : +v.toPrecision(3); })()}">
+      <button class="btn gold" id="alertGo">Создать</button></div></div>
+    <div class="form" id="fAdd"><div class="two"><div class="field"><input id="sAmount" inputmode="decimal" placeholder="Сколько монет"></div>
+      <div class="field"><input id="sBuy" inputmode="decimal" placeholder="Цена покупки, $"></div></div>
+      <button class="btn gold wide" id="addGo">Добавить</button></div>
+    <button class="btn wide" id="toChat">Прислать карточку в чат</button>`;
+  const arg = { coin: c.id, symbol: c.symbol, name: c.name };
+  $("sheetIn").querySelectorAll(".act").forEach(b => b.onclick = () => {
+    const a = b.dataset.a;
+    if (a === "explain" || a === "scam") return send(a, arg);
+    $("sheetIn").querySelectorAll(".act").forEach(x => x.classList.toggle("on", x === b));
+    $("fAlert").classList.toggle("on", a === "alert"); $("fAdd").classList.toggle("on", a === "add");
+    (a === "alert" ? $("alertPrice") : $("sAmount")).focus();
+  });
+  $("alertGo").onclick = () => { const p = num($("alertPrice").value); p ? send("alert", { ...arg, price: p }) : toast("Укажи цену числом"); };
+  $("addGo").onclick = () => { const a = num($("sAmount").value); a ? send("add", { ...arg, amount: a, buy: num($("sBuy").value) || "" }) : toast("Укажи количество числом"); };
+  $("toChat").onclick = () => send("price", arg);
+  $("scrim").classList.add("on"); $("sheet").classList.add("on");
+}
+// «73,700» и «73 700» — тысячи; «0,5» — дробь
+const num = s => {
+  let t = String(s).trim().replace(/[\s$]/g, "");
+  t = /^\d{1,3}(,\d{3})+(\.\d+)?$/.test(t) ? t.replace(/,/g, "") : t.replace(",", ".");
+  const v = parseFloat(t); return v > 0 && isFinite(v) ? v : null;
+};
+function closeSheet() { $("scrim").classList.remove("on"); $("sheet").classList.remove("on"); }
+$("scrim").onclick = closeSheet;
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
+
+// ---------- портфель ----------
+async function renderPortfolio() {
+  const h = D.h || [];
+  $("pfLimit").textContent = isPro() ? "" : `Без премиума — до ${D.lim.pf} ${plural(D.lim.pf, ["монеты", "монет", "монет"])} в портфеле. Сейчас: ${h.length}.`;
+  if (!h.length) {
+    $("pfHead").innerHTML = `<div><b>Портфель пуст</b><div class="muted small">Добавь первую монету ниже — посчитаю стоимость, изменение за сутки и прибыль с покупки.</div></div>`;
+    $("holdings").innerHTML = '<div class="state">Здесь появятся твои монеты</div>'; $("cardBtn").style.display = "none"; return;
+  }
+  $("cardBtn").style.display = "";
+  const coins = await coinsByIds(h.map(x => x[0]));
+  const rows = h.map(([id, sym, amount, buy]) => {
+    const c = coins.find(x => x.id === id), price = c ? c.current_price : null;
+    return { id, sym, amount, buy, c, price, value: price != null ? price * amount : null, change: c ? c.price_change_percentage_24h : null };
+  }).sort((a, b) => (b.value || 0) - (a.value || 0));
+  const total = rows.reduce((s, r) => s + (r.value || 0), 0);
+  const prev = rows.reduce((s, r) => s + (r.value ? r.value / (1 + (r.change || 0) / 100) : 0), 0);
+  let acc = 0;
+  const arcs = rows.filter(r => r.value).map((r, i) => {
+    const frac = r.value / total, a0 = acc * 2 * Math.PI, a1 = (acc += frac) * 2 * Math.PI, large = frac > .5 ? 1 : 0;
+    const p = a => [54 + 46 * Math.sin(a), 54 - 46 * Math.cos(a)].map(v => v.toFixed(2)).join(",");
+    return frac >= .999 ? `<circle cx="54" cy="54" r="46" fill="none" stroke="${PALETTE[i % 7]}" stroke-width="14"/>`
+      : `<path d="M${p(a0)}A46,46 0 ${large} 1 ${p(a1)}" fill="none" stroke="${PALETTE[i % 7]}" stroke-width="14"/>`;
+  }).join("");
+  const dayPct = prev ? (total / prev - 1) * 100 : null;
+  $("pfHead").innerHTML = `<svg class="donut" viewBox="0 0 108 108" aria-hidden="true">${arcs || '<circle cx="54" cy="54" r="46" fill="none" stroke="#26375C" stroke-width="14"/>'}</svg>
+    <div><span class="muted small">Стоимость</span><span class="num total">${total ? usd(total) : "—"}</span>
+      <div>${chg(dayPct)} <span class="muted small">за сутки</span></div>
+      <div class="legend">${rows.filter(r => r.value).slice(0, 6).map((r, i) => `<span><i style="background:${PALETTE[i % 7]}"></i>${esc(r.sym)} ${Math.round(r.value / total * 100)}%</span>`).join("")}</div></div>`;
+  $("holdings").innerHTML = rows.map(r => {
+    const pnl = r.buy && r.price != null ? (r.price - r.buy) * r.amount : null;
+    return `<div class="hrow">${r.c && r.c.image ? `<img src="${esc(r.c.image)}" alt="" style="width:30px;height:30px;border-radius:50%">` : `<span class="avatar">${esc(r.sym.slice(0, 3))}</span>`}
+      <div><b>${esc(r.sym)}</b><div class="muted small">${r.amount} ${r.buy ? `по ${usd(r.buy)}` : ""}</div></div>
+      <div class="r"><span class="num">${usd(r.value)}</span>${pnl != null ? `<span class="chg ${pnl >= 0 ? "up" : "down"}">${pnl >= 0 ? "+" : "−"}${usd(Math.abs(pnl))}</span>` : chg(r.change)}</div></div>`;
+  }).join("");
+}
+$("cardBtn").onclick = () => send("card");
+let ADD_COIN = null;
+$("addSearch").onsubmit = async e => {
+  e.preventDefault();
+  const q = $("addQuery").value.trim(); if (!q) return;
+  $("addPick").innerHTML = '<span class="muted small">Ищу…</span>';
+  try {
+    const found = (await cg("/search?query=" + encodeURIComponent(q), 3600)).coins.slice(0, 5);
+    $("addPick").innerHTML = found.map(c => `<button type="button" data-id="${esc(c.id)}" data-s="${esc(c.symbol)}" data-n="${esc(c.name)}">${esc(c.symbol.toUpperCase())}, ${esc(c.name)}</button>`).join("")
+      || '<span class="muted small">Ничего не нашёл</span>';
+    $("addPick").querySelectorAll("button").forEach(b => b.onclick = () => {
+      $("addPick").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+      ADD_COIN = { coin: b.dataset.id, symbol: b.dataset.s, name: b.dataset.n };
+      $("addForm").classList.add("on"); $("addBtn").disabled = false; $("addAmount").focus();
+    });
+  } catch (err) { $("addPick").innerHTML = `<span class="muted small">${esc(err.message)}</span>`; }
+};
+$("addBtn").onclick = () => {
+  const a = num($("addAmount").value);
+  if (!ADD_COIN) return toast("Сначала выбери монету");
+  if (!a) return toast("Укажи количество числом");
+  send("add", { ...ADD_COIN, amount: a, buy: num($("addBuy").value) || "" });
+};
+
+// ---------- игра ----------
+function renderGame() {
+  const g = D.g, btc = byId("bitcoin"), now = btc ? btc.current_price : null;
+  $("gOpen").textContent = usd(g.open); $("gNow").textContent = usd(now);
+  if (g.open && now) $("gNow").className = "num " + (now >= g.open ? "up" : "down");
+  const closed = new Date().getUTCHours() >= g.close;
+  ["betUp", "betDown"].forEach(id => { const b = $(id); b.disabled = !!g.guess || closed; b.classList.toggle("picked", (g.guess === "up" && id === "betUp") || (g.guess === "down" && id === "betDown")); });
+  $("gHint").textContent = g.guess ? `Твой прогноз: ${g.guess === "up" ? "вверх" : "вниз"}. Итоги придут в чат завтра утром.`
+    : closed ? `Приём на сегодня закрыт после ${g.close}:00 UTC. Возвращайся завтра.` : `Прогнозы принимаются до ${g.close}:00 UTC. За угаданный день +10 очков.`;
+  const inCycle = g.streak % 7;
+  $("gStreak").innerHTML = Array.from({ length: 7 }, (_, i) => `<i class="${i < inCycle || (g.streak && inCycle === 0 && g.streak >= 7) ? "on" : ""}"></i>`).join("");
+  const left = 7 - inCycle;
+  $("gStreakText").innerHTML = `Серия: <b>${g.streak}</b> ${plural(g.streak, ["день", "дня", "дней"])}. ${g.streak && inCycle === 0 ? "Премиум за серию получен!" : `Ещё ${left} ${plural(left, ["угаданный день", "угаданных дня", "угаданных дней"])} — и 3 дня премиума в подарок.`}`;
+  const medals = ["🥇", "🥈", "🥉", "4", "5"];
+  $("board").innerHTML = (g.top || []).length ? g.top.map(([n, p, s], i) => `<div><span>${medals[i]}</span><span>${esc(n)}${s >= 3 ? ` <span class="muted small">серия ${s}</span>` : ""}</span><b class="num">${p}</b></div>`).join("")
+    : '<div><span></span><span class="muted">Пока никого — стань первым</span><span></span></div>';
+  $("refText").textContent = `За каждого друга, который придёт по твоей ссылке, вам обоим ${D.refDays} ${plural(D.refDays, ["день", "дня", "дней"])} премиума.`;
+  $("refLink").textContent = D.ref || "Ссылка появится, когда откроешь мини-апп из бота";
+}
+function tickClock() {
+  const n = new Date(), end = Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate() + 1), s = Math.max(0, Math.floor((end - n) / 1000));
+  $("gClock").textContent = `Итоги через ${Math.floor(s / 3600)} ч ${String(Math.floor(s / 60) % 60).padStart(2, "0")} мин`;
+}
+$("betUp").onclick = () => send("guess", { text: "up" });
+$("betDown").onclick = () => send("guess", { text: "down" });
+$("copyRef").onclick = async () => { try { await navigator.clipboard.writeText(D.ref); toast("Ссылка скопирована"); } catch (e) { toast("Не удалось скопировать"); } };
+$("shareRef").onclick = () => {
+  if (!D.ref) return;
+  const url = "https://t.me/share/url?url=" + encodeURIComponent(D.ref) + "&text=" + encodeURIComponent("Проверяю монеты на скам и слежу за портфелем — попробуй");
+  inTg && tg.openTelegramLink ? tg.openTelegramLink(url) : window.open(url, "_blank");
+};
+
+// ---------- премиум ----------
+function renderPremium() {
+  const l = D.lim;
+  $("status").className = "status" + (isPro() ? " pro" : "");
+  $("status").innerHTML = isPro()
+    ? `<b style="font-size:17px">Премиум активен</b><div class="muted small">до ${new Date(D.pr).toLocaleDateString("ru-RU")}. Можно продлить заранее — дни сложатся.</div>`
+    : `<b style="font-size:17px">${l.ai ? `Осталось ${l.ai} из ${l.aiMax} бесплатных ИИ-разборов сегодня` : "Бесплатные ИИ-разборы на сегодня закончились"}</b>
+       <div class="meter"><i style="width:${Math.round(l.ai / l.aiMax * 100)}%"></i></div>
+       <div class="muted small" style="margin-top:8px">${l.scam ? "Скам-проверка на сегодня ещё есть." : "Бесплатная скам-проверка сегодня уже использована."} Лимиты обновляются каждый день.</div>`;
+  const rowsC = [["ИИ-разборы и вопросы", `${l.aiMax} в день`, "Без лимита"], ["Проверка на скам", "1 в день", "Без лимита"],
+    ["Алерты по цене", `${l.alerts}`, "50"], ["Монет в портфеле", `${l.pf}`, "Без лимита"], ["ИИ-разбор портфеля", "Нет", "Есть"],
+    ["Разбор скриншотов графиков", `в счёт ИИ-лимита`, "Без лимита"], ["Утренняя сводка рынка", "Нет", "Каждый день"]];
+  $("compare").innerHTML = `<tr><th></th><th>Бесплатно</th><th>Премиум</th></tr>` + rowsC.map(r => `<tr><td>${r[0]}</td><td class="muted">${r[1]}</td><td>${r[2]}</td></tr>`).join("");
+  const week = D.plans.find(p => p[0] === "week"), weekRate = week ? week[2] / week[1] : null;
+  $("plans").innerHTML = D.plans.map(([id, days, price, title]) => {
+    const save = weekRate && id !== "week" ? Math.round((1 - (price / days) / weekRate) * 100) : 0;
+    const perMonth = (price / days * 30).toFixed(2);
+    return `<button class="plan${id === D.pop ? " pop" : ""}" data-id="${id}">${id === D.pop ? '<span class="tag">Чаще всего берут</span>' : ""}
+      <span class="t"><b>${esc(title)}</b><span>${days >= 30 ? `$${perMonth} в месяц` : `${days} ${plural(days, ["день", "дня", "дней"])}`}${save > 0 ? ` <span class="save">выгоднее на ${save}%</span>` : ""}</span></span>
+      <span class="p">$${price}</span></button>`;
+  }).join("");
+  $("plans").querySelectorAll(".plan").forEach(b => b.onclick = () => send("buy", { text: b.dataset.id }));
+}
+
+// ---------- навигация ----------
+document.querySelectorAll(".tabbar button").forEach(b => b.onclick = () => {
+  haptic();
+  document.querySelectorAll(".tabbar button").forEach(x => x.classList.toggle("on", x === b));
+  document.querySelectorAll(".page").forEach(p => p.classList.toggle("on", p.id === "p-" + b.dataset.p));
+  window.scrollTo({ top: 0 });
+});
+$("limitNote").textContent = isPro() ? "Премиум активен: всё без лимитов"
+  : `Сегодня осталось бесплатно: ${D.lim.ai} ${plural(D.lim.ai, ["ИИ-разбор", "ИИ-разбора", "ИИ-разборов"])}, ${D.lim.scam ? "1 скам-проверка" : "скам-проверок нет"}`;
+if (!real) $("limitNote").textContent += " (пример — открой из бота, чтобы увидеть свои данные)";
+
+renderPortfolio(); renderGame(); renderPremium(); tickClock(); setInterval(tickClock, 30000);
+loadMarket();
+</script>
+</body>
+</html>
