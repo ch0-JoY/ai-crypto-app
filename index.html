@@ -394,8 +394,21 @@ const INIT = (tg && tg.initData) || "";
 const apiMode = !!(API && INIT);
 
 async function callApi(action, arg = {}) {
-  const r = await fetch(API.replace(/\/$/, "") + "/api", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ initData: INIT, action, arg }) });
+  const url = API.replace(/\/$/, "") + "/api", body = JSON.stringify({ initData: INIT, action, arg });
+  let r;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      // text/plain — без лишнего «предварительного» запроса, который некоторые сети и туннели режут
+      const ctrl = new AbortController(), stop = setTimeout(() => ctrl.abort(), 75000);
+      try { r = await fetch(url, { method: "POST", headers: { "Content-Type": "text/plain" }, body, signal: ctrl.signal }); }
+      finally { clearTimeout(stop); }
+      break;
+    } catch (e) {
+      if (e.name === "AbortError") throw new Error("ИИ не ответил за минуту — он сейчас перегружен. Попробуй ещё раз.");
+      if (attempt >= 3) throw new Error("Нет связи с ботом. Проверь, что бот запущен, и открой приложение заново из кнопки «📊 Рынок». Если бот только что перезапущен — подожди минуту.");
+      await new Promise(res => setTimeout(res, attempt * 2000));
+    }
+  }
   let data = {}; try { data = await r.json(); } catch (e) {}
   if (!r.ok) throw new Error(data.error || "Бот не отвечает. Проверь, что он запущен, и открой приложение заново.");
   if (data.state) { D = data.state; real = true; refreshAll(); }
